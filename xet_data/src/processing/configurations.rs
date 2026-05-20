@@ -4,6 +4,8 @@ use std::sync::Arc;
 use http::HeaderMap;
 use tracing::info;
 use xet_client::cas_client::auth::AuthConfig;
+#[cfg(not(target_family = "wasm"))]
+use xet_runtime::config::XetConfig;
 use xet_runtime::core::XetContext;
 #[cfg(not(target_family = "wasm"))]
 use xet_runtime::core::xet_cache_root;
@@ -109,12 +111,12 @@ impl TranslatorConfig {
 
                 (base_path.join(&config.shard.cache_subdir), base_path.join(&config.session.dir_name))
             } else if session.is_memory() {
-                let cache_path = xet_cache_root().join("memory");
+                let cache_path = resolve_cache_root(config).join("memory");
                 std::fs::create_dir_all(&cache_path)?;
 
                 (cache_path.join(&config.shard.cache_subdir), cache_path.join(&config.session.dir_name))
             } else {
-                let cache_path = compute_cache_path(&session.endpoint);
+                let cache_path = compute_cache_path(config, &session.endpoint);
                 std::fs::create_dir_all(&cache_path)?;
 
                 let staging_directory = cache_path.join(&config.data.staging_subdir);
@@ -191,10 +193,30 @@ impl TranslatorConfig {
     }
 }
 
-/// Computes a cache-safe path from an endpoint URL.
+/// Resolves the Xet cache root directory.
+///
+/// Returns the explicit `data.cache_root` config value when set, otherwise
+/// falls back to the environment-derived [`xet_cache_root()`] default. The
+/// explicit value lets sandboxed hosts (e.g. iOS apps) point the cache at a
+/// writable location that the environment chain cannot reach.
 #[cfg(not(target_family = "wasm"))]
-fn compute_cache_path(endpoint: &str) -> PathBuf {
-    let cache_root = xet_cache_root();
+fn resolve_cache_root(config: &XetConfig) -> PathBuf {
+    let configured = config.data.cache_root.trim();
+    if configured.is_empty() {
+        xet_cache_root()
+    } else {
+        // Run the explicit value through the same templating `xet_cache_root()`
+        // applies to environment-derived paths, so `~` and template tokens
+        // expand consistently regardless of where the path came from.
+        xet_runtime::utils::TemplatedPathBuf::evaluate(configured)
+    }
+}
+
+/// Computes a cache-safe path from an endpoint URL, rooted at the configured
+/// Xet cache root (see [`resolve_cache_root`]).
+#[cfg(not(target_family = "wasm"))]
+fn compute_cache_path(config: &XetConfig, endpoint: &str) -> PathBuf {
+    let cache_root = resolve_cache_root(config);
 
     let endpoint_prefix = endpoint
         .chars()
