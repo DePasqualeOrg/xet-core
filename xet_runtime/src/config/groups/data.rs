@@ -115,4 +115,17 @@ crate::config_group!({
     /// Use the environment variable `HF_XET_DATA_STAGING_SUBDIR` to set this value.
     ref staging_subdir: String = "staging".to_string();
 
+    /// Explicit path to the Xet cache root directory.
+    ///
+    /// When empty (the default), the cache root is resolved from the
+    /// `HF_XET_CACHE` / `HF_HOME` / `XDG_CACHE_HOME` environment chain,
+    /// falling back to `~/.cache/huggingface/xet` (see `xet_cache_root()`).
+    /// A non-empty value takes precedence over that entire chain — required
+    /// on sandboxed hosts (e.g. iOS apps) where the environment-derived
+    /// default is not writable. The value is run through the same `~` /
+    /// template-token expansion applied to the environment-derived paths.
+    ///
+    /// Use the environment variable `HF_XET_DATA_CACHE_ROOT` to set this value.
+    ref cache_root: String = String::new();
+
 });
