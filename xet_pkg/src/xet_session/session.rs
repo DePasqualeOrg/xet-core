@@ -828,7 +828,8 @@ mod tests {
             .await
             .unwrap();
         let initial = stream.progress().unwrap();
-        assert_eq!(initial.total_bytes, original.len() as u64);
+        // The total is discovered with the reconstruction terms, so it may not be known yet.
+        assert!(initial.total_bytes <= original.len() as u64);
         assert_eq!(initial.bytes_completed, 0);
 
         let mut collected = Vec::new();

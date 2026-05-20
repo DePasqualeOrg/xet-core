@@ -531,7 +531,8 @@ mod tests {
         let group = stream_group_async(&session, &endpoint).await;
         let mut stream = group.download_stream(file_info, None).await.unwrap();
         let initial = stream.progress().unwrap();
-        assert_eq!(initial.total_bytes, original.len() as u64);
+        // The total is discovered with the reconstruction terms, so it may not be known yet.
+        assert!(initial.total_bytes <= original.len() as u64);
         assert_eq!(initial.bytes_completed, 0);
 
         let mut collected = Vec::new();

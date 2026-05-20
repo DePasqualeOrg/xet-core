@@ -291,18 +291,13 @@ impl FileDownloadSession {
             reconstructor = reconstructor.with_file_size(file_size);
         }
 
-        // The download ends at the earlier of a bounded range end and the known file size. When either is
-        // known, set progress upfront so UI consumers get percentage-based progress; otherwise
-        // ReconstructionTermManager discovers the end and finalizes progress incrementally.
-        let range_end = range.map(|r| r.end).filter(|&end| end < u64::MAX);
-        let download_end = match (range_end, file_info.file_size()) {
-            (Some(range_end), Some(file_size)) => Some(range_end.min(file_size)),
-            (range_end, file_size) => range_end.or(file_size),
-        };
-        if let (Some(download_end), Some(updater)) = (download_end, &progress_updater) {
-            let start = range.map_or(0, |r| r.start);
-            updater.update_item_size(download_end - start, true);
-        }
+        // ReconstructionTermManager discovers and finalizes both aggregate
+        // totals (logical + transfer bytes) incrementally. Don't pre-finalize
+        // the logical total here even when it's known upfront: that desyncs it
+        // from the still-growing transfer total, and a consumer scaling the
+        // transfer ratio against an already-final logical total overshoots to
+        // ~100% early. The caller's file size is still used for the later
+        // SizeMismatch check.
 
         if let Some(updater) = progress_updater {
             reconstructor = reconstructor.with_progress_updater(updater);
