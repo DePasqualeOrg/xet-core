@@ -304,34 +304,15 @@ impl FileDownloadSession {
 
         let mut reconstructor = FileReconstructor::new(&self.ctx, &self.client, file_id);
 
-        match range {
-            Some(range) if range.end < u64::MAX => {
-                // Fully bounded range: we know the exact download size upfront.
-                let size = range.end - range.start;
-                if let Some(ref updater) = progress_updater {
-                    updater.update_item_size(size, true);
-                }
-                reconstructor = reconstructor.with_byte_range(range);
-            },
-            Some(range) => {
-                // Open-ended range (end == u64::MAX): pass the range to set the
-                // start position, but let ReconstructionTermManager discover
-                // the actual end and finalize progress incrementally.
-                reconstructor = reconstructor.with_byte_range(range);
-            },
-            None if file_info.file_size().is_some() => {
-                // Full file with caller-provided size. Set progress upfront so
-                // UI consumers get percentage-based progress. SizeMismatch is
-                // validated after reconstruction in download_file_with_id.
-                if let Some(ref updater) = progress_updater {
-                    updater.update_item_size(file_info.file_size().unwrap(), true);
-                }
-            },
-            None => {
-                // Full file with unknown size: the reconstructor uses
-                // FileRange::full() internally and ReconstructionTermManager
-                // discovers the size incrementally.
-            },
+        // ReconstructionTermManager discovers and finalizes both aggregate
+        // totals (logical + transfer bytes) incrementally. Don't pre-finalize
+        // the logical total here even when it's known upfront: that desyncs it
+        // from the still-growing transfer total, and a consumer scaling the
+        // transfer ratio against an already-final logical total overshoots to
+        // ~100% early. The caller's file size is still used for the later
+        // SizeMismatch check.
+        if let Some(range) = range {
+            reconstructor = reconstructor.with_byte_range(range);
         }
 
         if let Some(updater) = progress_updater {
