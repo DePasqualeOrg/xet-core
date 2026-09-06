@@ -232,6 +232,13 @@ impl XetDownloadStreamGroup {
         Ok(())
     }
 
+    /// Snapshot of logical and network progress across this group's streams.
+    /// Logical totals grow as reconstruction metadata is discovered; network
+    /// counters advance while ordered output is still waiting for a complete term.
+    pub fn progress(&self) -> xet_data::progress_tracking::GroupProgressReport {
+        self.inner.download_session.report()
+    }
+
     fn session(&self) -> &XetSession {
         &self.inner.session
     }
